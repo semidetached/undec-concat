@@ -17,6 +17,8 @@ data Tc : Set where
   _*_ : Tc → Tc → Tc
   v   : ℕ → Tc
 
+infixl 10 _*_
+
 {- Meta language symbols -}
 data Tx : Set where
   a : Tx
@@ -33,10 +35,11 @@ varTc : Codable Tc Tx
 varTc = record { ♯ = v; 
                  ♭ = TctoTx }
 
-infixl 5 _!_
+infixl 10 _!_
 
 mutual
   data U (A : Set) : Set where
+    _⇒_ : U A → U A → U A
     _∧_ : U A → U A → U A
     _∨_ : U A → U A → U A
     ∃   : (A → U A) → U A
@@ -48,7 +51,13 @@ mutual
     
     _≡_ : A → A → U A
 
+  infixl 5 _⇒_
+  infixl 6 _∧_
+  infixl 6 _∨_
+  infixl 7 _≡_
+
   El : ∀ {A} → U A → Set
+  El (t₁ ⇒ t₂) = (El t₁) → (El t₂)
   El (x ∧ x₁)  = (El x) and (El x₁)
   El (x ∨ x₁)  = (El x) or (El x₁)
   El (∃ p )    = Ex _ (λ w → (El (p w)))
@@ -59,6 +68,7 @@ mutual
   El _ = ⊥
 
 Elp : ∀ {A : Set} → {{vA : Codable A Tx}} → ℕ → U A → U A
+Elp n (t₁ ⇒ t₂) = (Elp n t₁) ⇒ (Elp n t₂)
 Elp n (x ∧ x₁) = (Elp n x) ∧ (Elp n x₁)
 Elp n (x ∨ x₁) = (Elp n x) ∨ (Elp n x₁)
 Elp {{vA}} n (∃ p) = ∃′ n (Elp (suc n) (p ((Codable.♯ vA) n)))
@@ -68,35 +78,54 @@ Elp n [ x ] = Elp n x
 Elp _ (l₁ ≡ l₂) = l₁ ≡ l₂
 Elp _ x = x
 
-Axiom2 : U Tc
-Axiom2 = ∃ (λ w → w ≡ α )
 
-prfAxiom2 : El Axiom2
-prfAxiom2 = exists α refl
+{----- Tc Axioms -----}
+Axiom1 : U Tc
+Axiom1 = Π λ x → Π λ y → Π λ z → x * (y * z) ≡ x * y * z
+
+postulate prfAxiom1 : El Axiom1
+
+
+Axiom2 : U Tc
+Axiom2 = Π λ x → Π λ y → Π λ z → Π λ u →
+           [ x * y ≡ z * u ] ⇒ [ x ≡ z ∧ y ≡ u ] ∨ ∃ λ w → [ [ x * w ≡ z ∧ w * u ≡ y ] ∨
+                                                             [ z * w ≡ x ∧ w * y ≡ u ] ]
+
+postulate prfAxiom2 : El Axiom2
 
 Axiom3 : U Tc
-Axiom3 = Π (λ w → w ≡ w)
+Axiom3 = Π λ x → Π λ y → ¬ (α ≡ x * y)
 
 prfAxiom3 : El Axiom3
-prfAxiom3 = λ s → refl
+prfAxiom3 = λ s s₁ → λ ()
 
 Axiom4 : U Tc
-Axiom4 = ¬ (α ≡ β)
+Axiom4 = Π λ x → Π λ y → ¬ (β ≡ x * y)
 
 prfAxiom4 : El Axiom4
-prfAxiom4 = λ ()
+prfAxiom4 = λ s s₁ → λ ()
 
 Axiom5 : U Tc
-Axiom5 = ¬ [ α ≡ β ]
+Axiom5 = ¬ (α ≡ β)
 
 prfAxiom5 : El Axiom5
 prfAxiom5 = λ ()
 
-Axiom6 : U Tc
-Axiom6 = Π λ x → (∃ λ y → x ≡ y)
+{----- Tc Theorems -----}
+Theorem1_α : U Tc
+Theorem1_α = Π λ y → Π λ u → α * y ≡ α * u ⇒ y ≡ u
 
-prfAxiom6 : El Axiom6
-prfAxiom6 = λ s → exists s refl
+prfTheorem1_α : El Theorem1_α
+prfTheorem1_α y u ev1 with (prfAxiom2 α y α u ev1)
+prfTheorem1_α y u ev1 | or-intro₁ (and-intro x x₁) = x₁
+prfTheorem1_α y u ev1 | or-intro₂ (exists l (or-intro₁ (and-intro x x₁))) = efq (prfAxiom3 α l (symEq x))
+prfTheorem1_α y u ev1 | or-intro₂ (exists l (or-intro₂ (and-intro x x₁))) = efq (prfAxiom3 α l (symEq x))
+
+Theorem7 : U Tc
+Theorem7 = Π λ x → Π λ y → ¬ (x * α ≡ y * β)
+
+prfTheorem7 : El Theorem7
+prfTheorem7 x y ()
 
 toTx : ℕ → Tx
 toTx n = b ! helper n ! b
@@ -106,6 +135,7 @@ toTx n = b ! helper n ! b
         helper _ = a
 
 Code : ∀ {A} → {{vA : Codable A Tx}} → U A → Tx
+Code (t₁ ⇒ t₂) = Code t₁ ! toTx 11 ! Code t₂
 Code (t₁ ∧ t₂) = Code t₁ ! toTx 12 ! Code t₂
 Code (t₁ ∨ t₂) = Code t₁ ! toTx 13 ! Code t₂
 Code (∃ x) = a
@@ -116,4 +146,4 @@ Code (¬ t) = (toTx 14) ! Code t
 Code [ t ] = toTx 3 ! Code t ! toTx 4
 Code {{vA}} (a₁ ≡ a₂) = (Codable.♭ vA a₁) ! toTx 8 ! (Codable.♭ vA a₂)
 
-codeAxiom5 = Code Axiom5
+--codeAxiom5 = Code Axiom5
