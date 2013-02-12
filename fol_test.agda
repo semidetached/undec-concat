@@ -28,7 +28,7 @@ data Tx : Set where
 TctoTx : Tc → Tx
 TctoTx α        = b ! a ! b
 TctoTx β        = b ! a ! a ! b
-TctoTx (x * x₁) = (TctoTx x) ! b ! a ! a ! a ! a ! a ! b ! (TctoTx x₁)
+TctoTx (x₁ * x₂) = (TctoTx x₁) ! b ! a ! a ! a ! a ! a ! b ! (TctoTx x₂)
 TctoTx (v x)    = b ! a ! a ! a ! a ! a ! a ! b  
  
 varTc : Codable Tc Tx
@@ -57,13 +57,13 @@ mutual
   infixl 7 _≡_
 
   El : ∀ {A} → U A → Set
-  El (t₁ ⇒ t₂) = (El t₁) → (El t₂)
-  El (x ∧ x₁)  = (El x) and (El x₁)
-  El (x ∨ x₁)  = (El x) or (El x₁)
-  El (∃ p )    = Ex _ (λ w → (El (p w)))
-  El (Π p)     = Pi _ (λ w → (El (p w)))
-  El (¬ p)     = (El p) → ⊥
-  El ([ p ])   = El p
+  El (t₁ ⇒ t₂) = (El t₁) →   (El t₂)
+  El (t₁ ∧ t₂) = (El t₁) and (El t₂)
+  El (t₁ ∨ t₂) = (El t₁) or  (El t₂)
+  El (∃ prop)  = Ex _ (λ w → (El (prop w)))
+  El (Π prop)  = Pi _ (λ w → (El (prop w)))
+  El (¬ t)     = El t → ⊥
+  El ([ t ])   = El t
   El (l₁ ≡ l₂) = Eq l₁ l₂
   El _ = ⊥
 
@@ -84,7 +84,6 @@ Axiom1 : U Tc
 Axiom1 = Π λ x → Π λ y → Π λ z → x * (y * z) ≡ x * y * z
 
 postulate prfAxiom1 : El Axiom1
-
 
 Axiom2 : U Tc
 Axiom2 = Π λ x → Π λ y → Π λ z → Π λ u →
